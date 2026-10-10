@@ -1,12 +1,11 @@
 # Pipas! · instalación
 
-Ficheiros:
 - `index.html` — o xogo.
-- `ranking.html` — o ranking (tamén para incrustar en cagando).
-- `config.js` — onde pegas os datos de Supabase.
+- `ranking.html` — só o ranking, para incrustar en cagando.
+- `config.js` — os datos de Supabase (proxecto "xogos").
 - `supabase.sql` — crea a táboa `pip_ranking`.
+- `vercel.json` — permite mostrar `ranking.html` nun iframe.
+- `pipas.png` — icona para cagando.
 
-Pasos detallados: mira a conversa con Claude.
-
-Parámetros de `ranking.html`: `lang` (gl, ca, eu, es), `n` (número de filas), `p` (hoxe, semana, mes, sempre), `v` (dia, p100, s100) e `embed=1` para fondo transparente.
-Exemplo: `ranking.html?lang=gl&n=5&p=hoxe&v=dia&embed=1`
+ranking.html: `lang` (gl, ca, eu, es) · `n` (posicións, 10) · `p` (hoxe, semana, mes, sempre) · `v` (dia, p100, s100)
+Exemplo: `https://comepipas.vercel.app/ranking.html?lang=gl&n=10`
