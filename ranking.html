@@ -94,6 +94,14 @@ function tabs(){
   document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{P=b.dataset.p;load()});
 }
 const cache={};
+/* Explicación técnica do erro, para saber que falla */
+function why(e){
+  if(e.message==='config') return 'config.js: faltan os datos de Supabase (ou o ficheiro non está subido).';
+  if(e.status===404||/PGRST205|42P01|does not exist|Could not find the table/i.test(e.body||'')) return 'Supabase: non existe a táboa pip_ranking. Executa supabase.sql no proxecto xogos.';
+  if(e.status===401||e.status===403) return 'Supabase: a clave de config.js non vale ou faltan os permisos (RLS). Volve executar supabase.sql.';
+  if(e.status) return 'Supabase respondeu '+e.status+': '+String(e.body||'').slice(0,120);
+  return 'Sen conexión con Supabase ('+(e.message||'erro')+').';
+}
 async function fetchRows(){
   const c=window.PIPAS_CONFIG; if(!c||!c.url||!c.key||c.url.includes('PEGA')) throw new Error('config');
   const today=madrid();
@@ -103,14 +111,14 @@ async function fetchRows(){
   if(P==='mes') f.push('dia=gte.'+shift(today,-29));
   const key=f.join('&'); if(cache[key]&&Date.now()-cache[key].t<30000) return cache[key].d;
   const r=await fetch(c.url.replace(/\/$/,'')+'/rest/v1/pip_ranking?'+key,{headers:{apikey:c.key,Authorization:'Bearer '+c.key}});
-  if(!r.ok) throw new Error(r.status);
+  if(!r.ok){ let b='';try{b=await r.text()}catch(e){} const er=new Error('http'); er.status=r.status; er.body=b; throw er }
   const d=await r.json(); cache[key]={t:Date.now(),d}; return d;
 }
 async function load(){
   tabs(); const list=$('list');
   list.innerHTML=`<li class="msg" style="display:block">${tt.load}</li>`;
   let data;
-  try{ data=await fetchRows() }catch(e){ list.innerHTML=`<li class="msg" style="display:block">${tt.err}</li>`; return }
+  try{ data=await fetchRows() }catch(e){ list.innerHTML=`<li class="msg" style="display:block">${tt.err}<br><small style="opacity:.8">${esc(why(e))}</small></li>`; console.warn('ranking',e); return }
   const by={};
   for(const r of data){
     const k=r.cliente||r.nome; const o=by[k]||(by[k]={nome:r.nome,v:null,sum:0,days:0,limpo:false,last:''});
