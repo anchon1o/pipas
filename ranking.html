@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="gl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipas! · Ranking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#F4F1E8;--muted:#BFC9BC;--panel:rgba(22,34,26,.74);--line:rgba(230,240,225,.18);--glass:rgba(230,240,225,.10);--accent:#F2C94C;
+  --font:"Bricolage Grotesque",ui-rounded,"Segoe UI",system-ui,sans-serif;box-sizing:border-box;color-scheme:dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--panel:rgba(18,28,21,.78)}}
+:root[data-theme="dark"]{--panel:rgba(18,28,21,.78)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;min-height:100vh;font-family:var(--font);color:var(--ink);
+  background:repeating-linear-gradient(180deg,#3F5E48 0 88px,#35503D 88px 92px,#1F2E23 92px 100px);}
+body.embed{background:transparent}
+.wrap{max-width:520px;margin:0 auto;padding:14px}
+h1{font-size:26px;margin:4px 0 10px;font-weight:800;letter-spacing:-.02em}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px}
+.tabs button{font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.tabs button.on{background:var(--ink);color:#1B2A20;border-color:transparent}
+.card{background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:20px;padding:8px 12px}
+ol{list-style:none;margin:0;padding:0}
+li{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--line);font-size:16px}
+li:last-child{border-bottom:0}
+li .pos{font-weight:800;color:var(--muted)}
+li:nth-child(1) .pos{color:var(--accent)}
+li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+li .v{font-weight:800;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);padding:14px 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="ttl"></h1>
+  <div class="tabs" id="vt"></div>
+  <div class="tabs" id="pt"></div>
+  <div class="card"><ol id="list"></ol></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+/* Parámetros: lang (gl|ca|eu|es), n (filas), p (hoxe|semana|mes|sempre), v (dia|p100|s100), embed=1 sen fondo */
+const T={
+ gl:{t:"Ranking",dia:"Reto do día",p100:"100 pipas",s100:"100 segundos",hoxe:"Hoxe",semana:"Semana",mes:"Mes",sempre:"Sempre",none:"Aínda non hai ninguén.",pts:"pts",days:"días",err:"Non se puido cargar."},
+ ca:{t:"Rànquing",dia:"Repte del dia",p100:"100 pipes",s100:"100 segons",hoxe:"Avui",semana:"Setmana",mes:"Mes",sempre:"Sempre",none:"Encara no hi ha ningú.",pts:"pts",days:"dies",err:"No s'ha pogut carregar."},
+ eu:{t:"Rankinga",dia:"Eguneko erronka",p100:"100 pipa",s100:"100 segundo",hoxe:"Gaur",semana:"Astea",mes:"Hilabetea",sempre:"Beti",none:"Oraindik ez dago inor.",pts:"pt",days:"egun",err:"Ezin izan da kargatu."},
+ es:{t:"Ranking",dia:"Reto del día",p100:"100 pipas",s100:"100 segundos",hoxe:"Hoy",semana:"Semana",mes:"Mes",sempre:"Siempre",none:"Todavía no hay nadie.",pts:"pts",days:"días",err:"No se pudo cargar."}};
+const q=new URLSearchParams(location.search);
+const L=T[q.get('lang')]?q.get('lang'):'gl', tt=T[L];
+let V=['dia','p100','s100'].includes(q.get('v'))?q.get('v'):'dia';
+let P=['hoxe','semana','mes','sempre'].includes(q.get('p'))?q.get('p'):'hoxe';
+const N=Math.max(1,Math.min(50,parseInt(q.get('n'))||10));
+if(q.get('embed')==='1') document.body.classList.add('embed');
+document.documentElement.lang=L; document.getElementById('ttl').textContent='🌻 '+tt.t;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const fmtT=s=>s<60?s.toFixed(1)+' s':`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+function tabs(){
+  document.getElementById('vt').innerHTML=['dia','p100','s100'].map(v=>`<button data-v="${v}" class="${v===V?'on':''}">${tt[v]}</button>`).join('');
+  document.getElementById('pt').innerHTML=['hoxe','semana','mes','sempre'].map(p=>`<button data-p="${p}" class="${p===P?'on':''}">${tt[p]}</button>`).join('');
+  document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{V=b.dataset.v;load()});
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{P=b.dataset.p;load()});
+}
+async function load(){
+  tabs(); const list=document.getElementById('list');
+  const c=window.PIPAS_CONFIG; if(!c||!window.supabase){list.innerHTML=`<li class="empty">${tt.err}</li>`;return}
+  const sb=window.supabase.createClient(c.url,c.key);
+  let qy=sb.from('pip_ranking').select('nome,cliente,valor,dia,limpo,creado').eq('modo',V).limit(2000);
+  if(V==='dia'&&P==='hoxe') qy=qy.eq('dia',today());
+  else if(P!=='sempre'){const d=new Date();d.setHours(0,0,0,0);if(P==='semana')d.setDate(d.getDate()-6);if(P==='mes')d.setDate(d.getDate()-29);qy=qy.gte('creado',d.toISOString())}
+  const {data,error}=await qy;
+  if(error){list.innerHTML=`<li class="empty">${tt.err}</li>`;return}
+  const by={};
+  for(const r of data){
+    const k=r.cliente||r.nome; const o=by[k]||(by[k]={nome:r.nome,v:null,sum:0,days:0,limpo:false,last:''});
+    if(r.creado>o.last){o.last=r.creado;o.nome=r.nome}
+    o.sum+=r.valor; o.days++; o.limpo=o.limpo||r.limpo;
+    if(o.v==null||(V==='p100'?r.valor<o.v:r.valor>o.v)) o.v=r.valor;
+  }
+  let rows=Object.values(by);
+  const sumMode = V==='dia'&&P!=='hoxe';
+  rows.sort((a,b)=> sumMode? b.sum-a.sum : V==='p100'? a.v-b.v : b.v-a.v);
+  rows=rows.slice(0,N);
+  list.innerHTML = rows.length? rows.map((r,i)=>`<li><span class="pos">${i+1}</span><span class="nm">${esc(r.nome)}${r.limpo?' 🧺':''}</span><span class="v">${
+     sumMode? `${Math.round(r.sum)} ${tt.pts} <small style="color:var(--muted);font-weight:500">· ${r.days} ${tt.days}</small>` : V==='p100'? fmtT(r.v) : `${Math.round(r.v)} ${tt.pts}`}</span></li>`).join('')
+    : `<li class="empty">${tt.none}</li>`;
+}
+load();
+</script>
+</body>
+</html>
